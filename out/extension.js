@@ -12,6 +12,7 @@ const { IconsInstallation } = require("./addIcon");
 const { Hover_log, DefinitionProvider, Hover_MQL, ItemProvider, HelpProvider, ColorProvider } = require("./provider");
 const { Cpp_prop, CreateProperties } = require("./createProperties");
 const outputChannel = vscode.window.createOutputChannel('MQL', 'mql-output');
+const platform = require('./platform');
 
 
 try {
@@ -39,13 +40,13 @@ function Compile(rt) {
     let logFile, command, MetaDir, incDir, CommM, CommI, teq, includefile, log;
 
     if (extension === '.mq4' || extension === '.mqh' && wn && rt === 0) {
-        MetaDir = config.Metaeditor.Metaeditor4Dir;
-        incDir = config.Metaeditor.Include4Dir;
+        MetaDir = platform.convertWindowsPathToMac(config.Metaeditor.Metaeditor4Dir);
+        incDir = platform.convertWindowsPathToMac(config.Metaeditor.Include4Dir);
         CommM = lg['path_editor4'];
         CommI = lg['path_include_4'];
     } else if (extension === '.mq5' || extension === '.mqh' && !wn && rt === 0) {
-        MetaDir = config.Metaeditor.Metaeditor5Dir;
-        incDir = config.Metaeditor.Include5Dir;
+        MetaDir = platform.convertWindowsPathToMac(config.Metaeditor.Metaeditor5Dir);
+        incDir = platform.convertWindowsPathToMac(config.Metaeditor.Include5Dir);
         CommM = lg['path_editor5'];
         CommI = lg['path_include_5'];
     } else if (extension === '.mqh' && rt !== 0) {
@@ -85,7 +86,8 @@ function Compile(rt) {
                     if (!fs.existsSync(incDir)) {
                         return resolve(), outputChannel.appendLine(`[Error]  ${CommI} [ ${incDir} ]`);
                     } else {
-                        includefile = ` /include:"${incDir}"`;
+                        const windowsIncDir = platform.convertMacPathToWindows(incDir);
+                        includefile = ` /include:"${windowsIncDir}"`;
                         Cpp_prop(incDir);
                     }
                 } else {
@@ -102,7 +104,16 @@ function Compile(rt) {
                     logFile = path.replace(fileName, fileName.match(/.+(?=\.)/) + '.log');
                 }
 
-                command = `"${MetaDir}" /compile:"${path}"${includefile}${rt === 1 || (rt === 2 && cme) ? '' : ' /s'} /log:"${logFile}"`;
+                const windowsPath = platform.convertMacPathToWindows(path);
+                const windowsLogFile = platform.convertMacPathToWindows(logFile);
+                const windowsMetaDir = platform.convertMacPathToWindows(MetaDir);
+
+                if (platform.isMac) {
+                    const vmName = config.Parallels?.vmName || 'Windows 11';
+                    command = `prlctl exec "${vmName}" "${windowsMetaDir}" /compile:"${windowsPath}"${includefile}${rt === 1 || (rt === 2 && cme) ? '' : ' /s'} /log:"${windowsLogFile}"`;
+                } else {
+                    command = `"${MetaDir}" /compile:"${path}"${includefile}${rt === 1 || (rt === 2 && cme) ? '' : ' /s'} /log:"${logFile}"`;
+                }
 
                 childProcess.exec(command, (err, stdout, stderror) => {
 

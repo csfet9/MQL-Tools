@@ -7,6 +7,8 @@
 	"engines": {
 		"vscode": "^1.63.0"
 	},
+	"os": ["win32", "darwin", "linux"],
+	"cpu": ["x64", "arm64", "arm", "ia32"],
 	"categories": [
 		"Programming Languages",
 		"Snippets",
@@ -149,6 +151,11 @@
 					"default": 500,
 					"minimum": 150,
 					"description": "%mql_tools.configuration.HelpVal.description%"
+				},
+				"mql_tools.Parallels.vmName": {
+					"type": "string",
+					"default": "Windows 11",
+					"description": "Name of the Parallels virtual machine for running MetaEditor (macOS only)"
 				},
 				"mql_tools.context": {
 					"type": "boolean",

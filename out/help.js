@@ -7,6 +7,7 @@ const https = require('https');
 const sleep = require('util').promisify(setTimeout);
 const language = vscode.env.language;
 const ext = require("./extension");
+const platform = require('./platform');
 
 
 function Help(sm) {
@@ -48,14 +49,37 @@ function Help(sm) {
     if (!fs.existsSync(PathHelp))
         return download(v, loc);    
 
-    childProcess.exec(`tasklist /FI "IMAGENAME eq KeyHH.exe"`, (err, stdout) => {
-        if (stdout.includes("KeyHH.exe") != true) {
-            childProcess.exec(`${PathKeyHH} -Mql ${PathHelp}`);
-            sleep(sm ? helpval : 1000).then(() => { childProcess.exec(`${PathKeyHH} -Mql -#klink '${keyword}' ${PathHelp}`); });
+    // Platform-specific help viewing
+    if (platform.isWindows) {
+        // Windows - use KeyHH.exe
+        childProcess.exec(`tasklist /FI "IMAGENAME eq KeyHH.exe"`, (err, stdout) => {
+            if (stdout.includes("KeyHH.exe") != true) {
+                childProcess.exec(`${PathKeyHH} -Mql ${PathHelp}`);
+                sleep(sm ? helpval : 1000).then(() => { childProcess.exec(`${PathKeyHH} -Mql -#klink '${keyword}' ${PathHelp}`); });
+            }
+            else
+                childProcess.exec(`${PathKeyHH} -Mql -#klink '${keyword}' ${PathHelp}`);
+        });
+    } else if (platform.isMac) {
+        // macOS - open help file with default CHM viewer or through Parallels
+        const vmName = config.Parallels?.vmName || 'Windows 11';
+        if (keyword) {
+            // If a keyword is selected, try to open through Parallels with KeyHH
+            const windowsPathHelp = platform.convertMacPathToWindows(PathHelp);
+            const windowsPathKeyHH = platform.convertMacPathToWindows(PathKeyHH);
+            childProcess.exec(`prlctl exec "${vmName}" "${windowsPathKeyHH}" -Mql -#klink '${keyword}' "${windowsPathHelp}"`);
+        } else {
+            // Otherwise, just open the CHM file
+            childProcess.exec(`open "${PathHelp}"`);
         }
-        else
-            childProcess.exec(`${PathKeyHH} -Mql -#klink '${keyword}' ${PathHelp}`);
-    });
+    } else {
+        // Linux - try xchm or other CHM viewers
+        childProcess.exec(`xchm "${PathHelp}"`, (err) => {
+            if (err) {
+                vscode.window.showErrorMessage(ext.lg['err_help_not_supported'] || 'CHM help files are not supported on this platform. Please install a CHM viewer.');
+            }
+        });
+    }
 }
 
 function download(n, locname) {

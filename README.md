@@ -1,5 +1,9 @@
 ## The MQL Tools extension adds language support for MQL (MetaQuotes Language) to VS Code, including functions:
 #
+
+### 🎉 macOS Support (including Apple Silicon M1/M2/M3)
+This fork now supports macOS with Apple Silicon! If you're using MetaTrader through Parallels Desktop, check out [README_MACOS.md](README_MACOS.md) for setup instructions.
+
 ### 1.  Checking the syntax of mqh/mq4/mq5 files (without compilation).
 
 ### 2.  Compilation of mq4/mq5 files.

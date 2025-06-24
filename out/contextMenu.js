@@ -4,6 +4,7 @@ const childProcess = require('child_process');
 const fs = require('fs');
 const pathModule = require('path');
 const ext = require("./extension");
+const platform = require('./platform');
 
 
 function ShowFiles(...args) {
@@ -179,11 +180,11 @@ function OpenFileInMetaEditor(uri) {
     let MetaDir, CommM;
     
     if (['.mq4', '.mqh'].includes(extension) && wn) {
-        MetaDir = config.Metaeditor.Metaeditor4Dir;
+        MetaDir = platform.convertWindowsPathToMac(config.Metaeditor.Metaeditor4Dir);
         CommM = ext.lg['path_editor4'];
     }
     else if (['.mq5', '.mqh'].includes(extension) && !wn) {
-        MetaDir = config.Metaeditor.Metaeditor5Dir;
+        MetaDir = platform.convertWindowsPathToMac(config.Metaeditor.Metaeditor5Dir);
         CommM = ext.lg['path_editor5'];
     }
     else
@@ -196,7 +197,15 @@ function OpenFileInMetaEditor(uri) {
     }
 
     try {
-        childProcess.exec(`"${MetaDir}" "${uri.fsPath}"`);
+        if (platform.isMac) {
+            // For macOS, open MetaEditor through Parallels
+            const vmName = config.Parallels?.vmName || 'Windows 11';
+            const windowsPath = platform.convertMacPathToWindows(uri.fsPath);
+            const windowsMetaDir = platform.convertMacPathToWindows(MetaDir);
+            childProcess.exec(`prlctl exec "${vmName}" "${windowsMetaDir}" "${windowsPath}"`);
+        } else {
+            childProcess.exec(`"${MetaDir}" "${uri.fsPath}"`);
+        }
     }
     catch (e) {
         return vscode.window.showErrorMessage(`${ext.lg['err_open_in_me']} - ${fileName}`);
