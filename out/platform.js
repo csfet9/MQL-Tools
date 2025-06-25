@@ -3,6 +3,24 @@ const os = require('os');
 const pathModule = require('path');
 const fs = require('fs');
 
+let volumesCache = null;
+let volumesCacheTime = 0;
+const CACHE_DURATION = 30000; // 30 seconds
+
+function getVolumes() {
+    const now = Date.now();
+    if (!volumesCache || (now - volumesCacheTime) > CACHE_DURATION) {
+        try {
+            volumesCache = fs.readdirSync('/Volumes');
+            volumesCacheTime = now;
+        } catch (error) {
+            volumesCache = [];
+            volumesCacheTime = now;
+        }
+    }
+    return volumesCache;
+}
+
 // Detect the current platform
 const platform = os.platform();
 const isWindows = platform === 'win32';
@@ -27,7 +45,7 @@ function convertWindowsPathToMac(windowsPath) {
     let macPath = windowsPath;
     
     // First, try to find the actual Parallels mount point
-    const volumes = fs.readdirSync('/Volumes');
+    const volumes = getVolumes();
     let cDrivePath = null;
     let dDrivePath = null;
     
@@ -87,7 +105,7 @@ function convertMacPathToWindows(macPath) {
     let windowsPath = macPath;
     
     // Find actual Parallels mount points
-    const volumes = fs.readdirSync('/Volumes');
+    const volumes = getVolumes();
     volumes.forEach(vol => {
         if (vol.includes('[C]') || vol.toLowerCase().includes('windows')) {
             // Convert Parallels mount point back to Windows C: drive
@@ -180,4 +198,4 @@ module.exports = {
     getPlatformExecutable,
     executeCommand,
     getPlatformDefaults
-}; 
+};  
