@@ -72,6 +72,9 @@ function convertWindowsPathToMac(windowsPath) {
     // Replace backslashes with forward slashes
     macPath = macPath.replace(/\\/g, '/');
     
+    // Clean up any double slashes (except at the beginning for UNC paths)
+    macPath = macPath.replace(/([^:])\/\//g, '$1/');
+    
     // Handle UNC paths (\\Mac\Home)
     macPath = macPath.replace(/^\\\\Mac\\Home/i, os.homedir());
     

@@ -55,6 +55,11 @@ function Compile(rt) {
         return undefined;
     }
 
+    // Clean up MetaDir path - remove any trailing quotes or extra characters
+    if (MetaDir) {
+        MetaDir = MetaDir.replace(/['"]/g, '').trim();
+    }
+
     vscode.window.withProgress(
         {
             location: vscode.ProgressLocation.Window,
