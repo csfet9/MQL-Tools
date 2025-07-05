@@ -166,6 +166,17 @@
 					"default": "Windows 11",
 					"description": "Name of the Parallels virtual machine for running MetaEditor (macOS only)"
 				},
+				"mql_tools.macOS.preferredMethod": {
+					"type": "string",
+					"default": "wine",
+					"enum": ["wine", "parallels"],
+					"description": "Preferred method for running MetaEditor on macOS (Wine or Parallels)"
+				},
+				"mql_tools.Wine.autoDetect": {
+					"type": "boolean",
+					"default": true,
+					"description": "Automatically detect Wine installation and MT5 Wine prefix"
+				},
 				"mql_tools.context": {
 					"type": "boolean",
 					"default": false,
@@ -288,6 +299,11 @@
 			{
 				"command": "mql_tools.openInME",
 				"title": "%mql_tools.commands.openInME.title%"
+			},
+			{
+				"command": "mql_tools.setupWine",
+				"title": "Setup Wine Integration",
+				"category": "MQL"
 			}
 		],
 		"menus": {

@@ -31,6 +31,38 @@ const isLinux = platform === 'linux';
 const isARM = os.arch() === 'arm64' || os.arch() === 'arm';
 
 /**
+ * Check if Wine is installed on the system
+ * @returns {boolean} - True if Wine is installed, false otherwise
+ */
+function checkWineInstallation() {
+    try {
+        require('child_process').execSync('which wine', { stdio: 'ignore' });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Detect Wine MetaTrader installation and paths
+ * @returns {Object} - Wine installation information
+ */
+function detectWineMetaTrader() {
+    const winePrefix = pathModule.join(os.homedir(), 'Library/Application Support/net.metaquotes.wine.metatrader5');
+    const mt5Path = pathModule.join(winePrefix, 'drive_c/Program Files/MetaTrader 5');
+    const mt4Path = pathModule.join(winePrefix, 'drive_c/Program Files/MetaTrader 4');
+    
+    return {
+        hasWinePrefix: fs.existsSync(winePrefix),
+        hasMT5: fs.existsSync(mt5Path),
+        hasMT4: fs.existsSync(mt4Path),
+        winePrefix,
+        mt5Path,
+        mt4Path
+    };
+}
+
+/**
  * Convert Windows path to Parallels shared folder path
  * @param {string} windowsPath - Windows path from configuration
  * @returns {string} - Converted path for macOS
@@ -133,6 +165,39 @@ function convertMacPathToWindows(macPath) {
 }
 
 /**
+ * Convert Windows path to Wine prefix path
+ * @param {string} windowsPath - Windows path to convert
+ * @returns {string} - Wine prefix path
+ */
+function convertPathForWine(windowsPath) {
+    if (!windowsPath || isWindows) return windowsPath;
+    
+    const wineInfo = detectWineMetaTrader();
+    if (!wineInfo.hasWinePrefix) return windowsPath;
+    
+    // Convert Windows path to Wine prefix path
+    let winePath = windowsPath;
+    winePath = winePath.replace(/^C:\\/i, wineInfo.winePrefix + '/drive_c/');
+    winePath = winePath.replace(/^D:\\/i, wineInfo.winePrefix + '/drive_d/');
+    winePath = winePath.replace(/\\/g, '/');
+    
+    return winePath;
+}
+
+/**
+ * Get Wine environment variables for command execution
+ * @returns {Object} - Environment variables for Wine
+ */
+function getWineEnvironment() {
+    const wineInfo = detectWineMetaTrader();
+    return wineInfo.hasWinePrefix ? {
+        ...process.env,
+        WINEPREFIX: wineInfo.winePrefix,
+        WINEDEBUG: '-all'
+    } : process.env;
+}
+
+/**
  * Get platform-specific executable path
  * @param {string} windowsExe - Windows executable name
  * @returns {string} - Platform-specific executable path
@@ -154,16 +219,31 @@ function getPlatformExecutable(windowsExe) {
  * Execute command with platform-specific handling
  * @param {string} command - Command to execute
  * @param {Function} callback - Callback function
+ * @param {Object} options - Additional options for command execution
  */
-function executeCommand(command, callback) {
+function executeCommand(command, callback, options = {}) {
     const childProcess = require('child_process');
+    const vscode = require('vscode');
     
     if (isMac && command.includes('.exe')) {
-        // For macOS, try to execute through Parallels
-        const parallelCommand = `prlctl exec {vm-name} ${command}`;
-        childProcess.exec(parallelCommand, callback);
+        const preferredMethod = vscode.workspace.getConfiguration('mql_tools').get('macOS.preferredMethod', 'wine');
+        
+        if (preferredMethod === 'wine' && checkWineInstallation()) {
+            const wineCommand = `wine "${convertPathForWine(command)}"`;
+            childProcess.exec(wineCommand, { 
+                env: getWineEnvironment(),
+                ...options 
+            }, callback);
+        } else if (preferredMethod === 'parallels' || !checkWineInstallation()) {
+            // Fallback to existing Parallels logic
+            const vmName = vscode.workspace.getConfiguration('mql_tools').get('Parallels.vmName', 'Windows 11');
+            const parallelCommand = `prlctl exec "${vmName}" ${command}`;
+            childProcess.exec(parallelCommand, options, callback);
+        } else {
+            callback(new Error('Neither Wine nor Parallels is available for MetaEditor execution'));
+        }
     } else {
-        childProcess.exec(command, callback);
+        childProcess.exec(command, options, callback);
     }
 }
 
@@ -178,10 +258,19 @@ function getPlatformDefaults() {
             metaeditor5: "C:\\MT5_Install\\MetaTrader\\metaeditor.exe"
         };
     } else if (isMac) {
-        return {
-            metaeditor4: "/Volumes/C/MT4_Install/MetaTrader/metaeditor.exe",
-            metaeditor5: "/Volumes/C/MT5_Install/MetaTrader/metaeditor.exe"
-        };
+        const wineInfo = detectWineMetaTrader();
+        if (wineInfo.hasWinePrefix) {
+            return {
+                metaeditor4: pathModule.join(wineInfo.mt4Path, 'metaeditor.exe'),
+                metaeditor5: pathModule.join(wineInfo.mt5Path, 'metaeditor64.exe')
+            };
+        } else {
+            // Fallback to Parallels paths
+            return {
+                metaeditor4: "/Volumes/C/MT4_Install/MetaTrader/metaeditor.exe",
+                metaeditor5: "/Volumes/C/MT5_Install/MetaTrader/metaeditor.exe"
+            };
+        }
     } else {
         return {
             metaeditor4: "/mnt/c/MT4_Install/MetaTrader/metaeditor.exe",
@@ -198,7 +287,11 @@ module.exports = {
     isARM,
     convertWindowsPathToMac,
     convertMacPathToWindows,
+    convertPathForWine,
     getPlatformExecutable,
     executeCommand,
-    getPlatformDefaults
-};  
+    getPlatformDefaults,
+    checkWineInstallation,
+    detectWineMetaTrader,
+    getWineEnvironment
+};                      
